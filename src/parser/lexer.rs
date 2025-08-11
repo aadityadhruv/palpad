@@ -1,36 +1,36 @@
 use std::{str::Chars, iter::Peekable};
 
-#[derive(Debug, PartialEq)]
-enum TokenType {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenType {
     TEXT,
     NEWLINE,
     HASH,
     BACKTICK,
 }
 
-#[derive(Debug, PartialEq)]
-struct Token {
-    token_type: TokenType,
-    value: String,
+#[derive(Debug, PartialEq, Clone)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub value: String,
     location: (u8, u8),
 }
 
 
 #[derive(Debug)]
-struct Scanner {
-    tokens: Vec<Token>,
+pub struct Lexer {
+    pub tokens: Vec<Token>,
     input_string: String,
     position: (u8, u8), //Line, index
 }
 
-impl Scanner {
-    fn new(source: &str) -> Self {
+impl Lexer {
+    pub fn new(source: &str) -> Self {
         let string = source.to_string();
-        Scanner { input_string: string.clone(), tokens: Vec::new(), position: (0, 0) }
+        Lexer { input_string: string.clone(), tokens: Vec::new(), position: (0, 0) }
     }
 
 
-    fn scan(&mut self) {
+    pub fn scan(&mut self) {
         let string = self.input_string.clone();
         let mut chars = string.chars().peekable();
 
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn init() {
         let source = "## This is a heading\nI am a bunch of paragraph text. I can get pretty long.";
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
         scanner.scan();
         let tokens = vec![
             Token { token_type: TokenType::HASH, value: "#".to_string(), location: (0, 0) },

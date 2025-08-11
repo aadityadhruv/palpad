@@ -35,8 +35,8 @@ pub struct Paragraph {
 }
 
 impl Paragraph {
-    pub fn new() -> Self {
-        Paragraph { text: String::new() } 
+    pub fn new(text: String) -> Self {
+        Paragraph { text: text } 
     }
 }
 impl Renderable for Paragraph {
@@ -80,8 +80,8 @@ pub struct Heading {
 }
 
 impl Heading {
-    pub fn new() -> Self {
-        Heading { text: String::new(), level: 1 } 
+    pub fn new(text: String, level: u8) -> Self {
+        Heading { text: text, level: level } 
     }
 }
 impl Renderable for Heading {
@@ -99,7 +99,7 @@ impl Renderable for Heading {
 
 // Heading
 pub struct HTML {
-    items: Vec<Box<dyn Renderable>>,
+    pub items: Vec<Box<dyn Renderable>>,
 }
 
 impl HTML {
@@ -111,13 +111,14 @@ impl HTML {
 impl Renderable for HTML {
     fn render(&self) -> String {
         let mut master = String::new();
-        let start_tag =  "<html>";
+        let start_tag =  "<html>\n";
         let end_tag = "</html>";
 
         master.push_str(&start_tag);
         for child in &self.items {
             let text = child.render();
             master.push_str(text.as_str());
+            master.push_str("\n");
         }
         master.push_str(&end_tag);
         master
