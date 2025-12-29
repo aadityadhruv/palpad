@@ -130,6 +130,7 @@ impl Parser {
 
         return inner_text;
     }
+
     /* Parse a Text block
      * | TEXT | text TEXT | ASTERISK text ASTERISK | BACKTICK text BACKTICK
      */
@@ -144,7 +145,11 @@ impl Parser {
                     return self._asterisk_helper();
                 }
                 else if token.token_type == TokenType::BACKTICK {
-                    return Text { text: token.value.clone(), style: 0b000 }
+                    let mut inner_text = self.text();
+                    // It ends with a backtick 
+                    assert!(self.tokens.next().unwrap().token_type == TokenType::BACKTICK);
+                    inner_text.style |= CODE_STYLE;
+                    return inner_text;
                 }
                 panic!("Invalid expression for text!");
             },

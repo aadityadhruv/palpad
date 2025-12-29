@@ -47,6 +47,10 @@ impl Text {
         if self.style &  crate::parser::parser::BOLD_STYLE != 0 {
             s = format!("<b>{}</b>", s);
         }
+        if self.style &  crate::parser::parser::CODE_STYLE != 0 {
+            s = self.text.clone();
+            s = format!("<code>{}</code>", s);
+        }
 
         return s;
     }
