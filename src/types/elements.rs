@@ -29,14 +29,37 @@ impl Renderable for Body {
     }
 }
 
+
+pub struct Text {
+    pub text: String,
+    pub style: u8
+}
+
+impl Text {
+    /*
+     * Add styling to text and return it as a String
+     */
+    fn get_text(&self) -> String {
+        let mut s = self.text.clone();
+        if self.style &  crate::parser::parser::ITALIC_STYLE != 0 {
+            s = format!("<i>{}</i>", s);
+        }
+        if self.style &  crate::parser::parser::BOLD_STYLE != 0 {
+            s = format!("<b>{}</b>", s);
+        }
+
+        return s;
+    }
+}
+
 //Paragraph
 pub struct Paragraph {
-    text: String,
+    pub texts: Vec<Text>,
 }
 
 impl Paragraph {
-    pub fn new(text: String) -> Self {
-        Paragraph { text: text } 
+    pub fn new() -> Self {
+        Paragraph { texts: vec![] } 
     }
 }
 impl Renderable for Paragraph {
@@ -46,7 +69,11 @@ impl Renderable for Paragraph {
         let end_tag = "</p>";
 
         master.push_str(&start_tag);
-        master.push_str(&self.text);
+        // Iterate over all the styled text and generate a paragraph
+        for text in &self.texts {
+            let s: String = text.get_text();
+            master.push_str(&s);
+        }
         master.push_str(&end_tag);
         master
     }
