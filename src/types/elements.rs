@@ -111,9 +111,9 @@ pub struct Head {
 }
 
 impl Head {
-    pub fn new() -> Self {
+    pub fn new(text: String) -> Self {
         Head {
-            text: String::new(),
+            text: text,
         }
     }
 }
