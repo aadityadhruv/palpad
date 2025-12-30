@@ -7,21 +7,41 @@
  */
 use std::iter::Peekable;
 
-use super::lexer::{TokenType, Token, Lexer};
+use super::lexer::{Lexer, Token, TokenType};
 use crate::types::elements;
 
-pub static CODE_STYLE:   u8   = 0b100;
-pub static BOLD_STYLE:   u8   = 0b010;
-pub static ITALIC_STYLE: u8   = 0b001;
-
+pub static CODE_STYLE: u8 = 0b100;
+pub static BOLD_STYLE: u8 = 0b010;
+pub static ITALIC_STYLE: u8 = 0b001;
 
 struct Text {
+    token: Token,
     text: String,
-    style: u8
+    style: u8,
 }
 
 struct Paragraph {
     texts: Vec<Text>,
+}
+
+struct CodeBlock {
+    texts: Vec<Text>,
+}
+
+impl Into<elements::CodeBlock> for &CodeBlock {
+    fn into(self) -> elements::CodeBlock {
+        let mut para = elements::CodeBlock::new();
+        for text in &self.texts {
+            let s = text.text.clone();
+            let style = text.style;
+            let text = elements::Text {
+                text: s,
+                style: style,
+            };
+            para.texts.push(text);
+        }
+        return para;
+    }
 }
 
 impl Into<elements::Paragraph> for &Paragraph {
@@ -30,7 +50,10 @@ impl Into<elements::Paragraph> for &Paragraph {
         for text in &self.texts {
             let s = text.text.clone();
             let style = text.style;
-            let text = elements::Text {text: s, style: style };
+            let text = elements::Text {
+                text: s,
+                style: style,
+            };
             para.texts.push(text);
         }
         return para;
@@ -56,6 +79,12 @@ pub trait AST {
 impl AST for Paragraph {
     fn convert_to_renderable(&self) -> Box<dyn elements::Renderable> {
         let text: elements::Paragraph = self.into();
+        return Box::new(text);
+    }
+}
+impl AST for CodeBlock {
+    fn convert_to_renderable(&self) -> Box<dyn elements::Renderable> {
+        let text: elements::CodeBlock = self.into();
         return Box::new(text);
     }
 }
@@ -90,19 +119,21 @@ pub struct Parser {
     pub tree: Node,
 }
 
-
 impl Parser {
     pub fn new(lexer: Lexer) -> Self {
         let root = Node { children: vec![] };
         let input_lexer = lexer;
         let input_tokens = input_lexer.tokens.clone().into_iter().peekable();
-        Parser { lexer: input_lexer, tokens: input_tokens, tree: root }
+        Parser {
+            lexer: input_lexer,
+            tokens: input_tokens,
+            tree: root,
+        }
     }
 
-
     fn _asterisk_helper(&mut self) -> Text {
-        let is_bold= self.tokens.peek().unwrap().token_type == TokenType::ASTERISK;
-        let _tmp_token  = self.tokens.peek().unwrap().value.clone();
+        let is_bold = self.tokens.peek().unwrap().token_type == TokenType::ASTERISK;
+        let _tmp_token = self.tokens.peek().unwrap().value.clone();
         // Move ahead of asterisk
         if is_bold {
             self.tokens.next();
@@ -116,7 +147,7 @@ impl Parser {
             inner_text.style |= BOLD_STYLE;
             // Move over the asterisk
             self.tokens.next();
-        } 
+        }
         // Meaning we have something like ** TEXT *
         else if is_bold && !is_bold_after {
             let _tmp: &str = &inner_text.text;
@@ -127,7 +158,6 @@ impl Parser {
         else {
             inner_text.style |= ITALIC_STYLE;
         }
-
         return inner_text;
     }
 
@@ -138,27 +168,42 @@ impl Parser {
         match &self.tokens.next() {
             Some(token) => {
                 if token.token_type == TokenType::TEXT {
-                    return Text { text: token.value.clone(), style: 0b000 }
+                    return Text {
+                        text: token.value.clone(),
+                        style: 0b000,
+                        token: token.clone(),
+                    };
                 }
                 // Bold or italic text
                 else if token.token_type == TokenType::ASTERISK {
                     return self._asterisk_helper();
-                }
-                else if token.token_type == TokenType::BACKTICK {
+                } else if token.token_type == TokenType::BACKTICK {
                     let mut inner_text = self.text();
-                    // It ends with a backtick 
-                    assert!(self.tokens.next().unwrap().token_type == TokenType::BACKTICK);
-                    inner_text.style |= CODE_STYLE;
-                    return inner_text;
+                    // It ends with a backtick
+                    let token = self.tokens.peek();
+                    if token.is_none() || token.as_ref().unwrap().token_type != TokenType::BACKTICK
+                    {
+                        // Restore backtick if not closed correctly (treat as normal)
+                        let _tmp = inner_text.text;
+                        inner_text.text = format!("`{_tmp}");
+                        return inner_text;
+                    }
+                    if token.unwrap().token_type == TokenType::BACKTICK {
+                        self.tokens.next();
+                        inner_text.style |= CODE_STYLE;
+                        return inner_text;
+                    }
                 }
                 panic!("Invalid expression for text!");
-            },
-            None => { panic!("Invalid expression for text!") }
+            }
+            None => {
+                panic!("Invalid expression for text!")
+            }
         }
     }
 
     /*
-     * A collection of texts until a newline. It's essentially just a line, but 
+     * A collection of texts until a newline. It's essentially just a line, but
      * calling it a paragraph alligns it with the HTML equivalent
      */
     fn paragraph(&mut self) -> Paragraph {
@@ -171,45 +216,166 @@ impl Parser {
         return para;
     }
 
+    /* Parse a Text block - Unformatted text
+     * | TEXT | text TEXT
+     */
+    fn raw_text(&mut self) -> Text {
+        match &self.tokens.next() {
+            Some(token) => {
+                return Text {
+                    text: token.value.clone(),
+                    style: 0b000,
+                    token: token.clone(),
+                }
+            }
+            None => {
+                panic!("Invalid expression for rawtext!")
+            }
+        }
+    }
+    /*
+     * A codeblock is just a bunch of lines with <code> and <pre> applied
+     * No other formatting applies to the block
+     * 3BT raw_text 3BT
+     */
+    fn code_block(&mut self) -> CodeBlock {
+        let mut para = CodeBlock { texts: vec![] };
+        loop {
+            let token = match self.tokens.peek() {
+                Some(token) => token,
+                None => {
+                    return para;
+                }
+            };
+            println!("CodeBlock: Got {:?}, {:?}", token.token_type, token.value);
+            if token.token_type == TokenType::BACKTICK {
+                // This is a backtick
+                let next1 = self.raw_text();
+                let next2 = match self.tokens.peek() {
+                    Some(token) => token,
+                    None => {
+                        return para;
+                    }
+                };
+                println!("CodeBlock-2: Got {:?}, {:?}", next2.token_type, next2.value);
+                if next2.token_type == TokenType::BACKTICK {
+                    // This is a backtick
+                    let next2 = self.raw_text();
+                    let next3 = match self.tokens.peek() {
+                        Some(token) => token,
+                        None => {
+                            return para;
+                        }
+                    };
+                    println!("CodeBlock-3: Got {:?}, {:?}", next3.token_type, next3.value);
+                    if next3.token_type == TokenType::BACKTICK {
+                        // We are now closing the codeblock - break
+                        // Let us also finally consume next3
+                        self.tokens.next();
+                        return para;
+                    } else {
+                        // Not a closing statment. Add next1 and next2 as texts
+                        para.texts.push(next1);
+                        para.texts.push(next2);
+                    }
+                } else {
+                    // Not a closing statement. Add next1 as text
+                    para.texts.push(next1);
+                }
+            }
+            let text = self.raw_text();
+            para.texts.push(text);
+        }
+    }
 
     /* Parse a Heading
-     * HASH heading | HASH paragraph 
+     * HASH heading | HASH paragraph
      */
     fn heading(&mut self) -> Heading {
         let mut heading_size = 0;
         while self.tokens.peek().unwrap().token_type == TokenType::HASH {
             heading_size += 1;
             self.tokens.next();
-        };
+        }
         let heading_text = self.text();
-        return Heading { level: heading_size, text: heading_text }
+        return Heading {
+            level: heading_size,
+            text: heading_text,
+        };
     }
 
     /* exp
-     * paragraph | heading
+     * paragraph | heading | code-block
+     *
      */
     fn exp(&mut self) -> Exp {
         let token = self.tokens.peek();
         if token.is_none() {
-            return Exp {item: Box::new(Noop{}) };
+            return Exp {
+                item: Box::new(Noop {}),
+            };
         }
         let token = token.unwrap().clone();
-        println!("Got {:?}", token.token_type);
-        if token.token_type == TokenType::TEXT 
-        || token.token_type == TokenType::ASTERISK 
-        || token.token_type == TokenType::BACKTICK
+
+        println!("Got {:?}, {:?}", token.token_type, token.value);
+
+        if token.token_type == TokenType::BACKTICK {
+            println!("Considering codeblock");
+            // Let's check for code block first, tmp clone
+            let mut _tmp = self.tokens.clone();
+            // Move it to current peeked entry
+            _tmp.next();
+            match _tmp.next() {
+                Some(token) => {
+                    if token.token_type == TokenType::BACKTICK {
+                        // 2 backticks, check for third
+                        match _tmp.next() {
+                            Some(token2) => {
+                                if token2.token_type == TokenType::BACKTICK {
+                                    // 3 backticks, it's a code block
+                                    // Let's also move the iterator ahead so we don't
+                                    // include backticks in the block
+                                    self.tokens.next();
+                                    self.tokens.next();
+                                    self.tokens.next();
+                                    let code = self.code_block();
+                                    return Exp {
+                                        item: Box::new(code),
+                                    };
+                                }
+                            }
+                            None => {
+                                /*Leave it to other if branches*/
+
+                                println!("Next2 is not backtick");
+                            }
+                        }
+                    }
+                }
+                None => {
+                    /*Leave it to other if branches*/
+                    println!("Next is not backtick");
+                }
+            }
+        }
+        if token.token_type == TokenType::TEXT
+            || token.token_type == TokenType::ASTERISK
+            || token.token_type == TokenType::BACKTICK
         {
             let tree = self.paragraph();
-            return Exp { item: Box::new(tree) };
+            return Exp {
+                item: Box::new(tree),
+            };
         }
 
         if token.token_type == TokenType::HASH {
             let tree = self.heading();
-            return Exp { item: Box::new(tree) };
+            return Exp {
+                item: Box::new(tree),
+            };
         }
 
         panic!("Invalid Exp type!")
-
     }
 
     /* Node
@@ -223,20 +389,20 @@ impl Parser {
         loop {
             match self.tokens.peek() {
                 Some(token) => {
-                if token.token_type == TokenType::NEWLINE { 
-                    self.tokens.next();
-                    continue
-                } else {
-                    node.children.push(self.exp());
+                    if token.token_type == TokenType::NEWLINE {
+                        self.tokens.next();
+                        continue;
+                    } else {
+                        node.children.push(self.exp());
+                    }
                 }
-                },
-                None => { break }
+                None => break,
             }
         }
         return node;
     }
 
-    // Entrypoint - we always begin with a node 
+    // Entrypoint - we always begin with a node
     pub fn parse(&mut self) {
         self.tree = self.node();
     }

@@ -1,11 +1,11 @@
 /*
  *
- * The Lexer. 
+ * The Lexer.
  *
  * Read a file and generate a stream of Tokens, of type TokenType
  *
  */
-use std::{str::Chars, iter::Peekable};
+use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
@@ -23,8 +23,6 @@ pub struct Token {
     location: (u8, u8),
 }
 
-
-
 /*
  * A Lexer struct consists of a list of tokens, the input string which generated the list, and the
  * current position we are at in the lexing stage
@@ -40,9 +38,12 @@ impl Lexer {
     // Read file contents, and construct the struct to get ready for lexing
     pub fn new(source: &str) -> Self {
         let string = source.to_string();
-        Lexer { input_string: string.clone(), tokens: Vec::new(), position: (0, 0) }
+        Lexer {
+            input_string: string.clone(),
+            tokens: Vec::new(),
+            position: (0, 0),
+        }
     }
-
 
     // Main lexing loop. Read the input string to create a stream of tokens
     pub fn scan(&mut self) {
@@ -55,8 +56,8 @@ impl Lexer {
                 Some(c) => {
                     // What token are we currently reading?
                     self.scan_token(c, &mut chars);
-                },
-                None => { break }
+                }
+                None => break,
             }
         }
     }
@@ -66,39 +67,54 @@ impl Lexer {
     // self.position
     fn scan_token(&mut self, token: char, iter: &mut Peekable<Chars>) {
         match token {
-
             // Headers
-            '#' => { 
-                let token = Token { token_type: TokenType::HASH, value: token.to_string(), location: self.position }; 
+            '#' => {
+                let token = Token {
+                    token_type: TokenType::HASH,
+                    value: token.to_string(),
+                    location: self.position,
+                };
                 self.position.1 += 1;
                 self.tokens.push(token);
-            },
+            }
 
             // Asterisk - bold or italic statement
-            '*' => { 
-                let token = Token { token_type: TokenType::ASTERISK, value: token.to_string(), location: self.position }; 
+            '*' => {
+                let token = Token {
+                    token_type: TokenType::ASTERISK,
+                    value: token.to_string(),
+                    location: self.position,
+                };
                 self.position.1 += 1;
                 self.tokens.push(token);
-            },
+            }
             // Backtick - in line code
-            '`' => { 
-                let token = Token { token_type: TokenType::BACKTICK, value: token.to_string(), location: self.position }; 
+            '`' => {
+                let token = Token {
+                    token_type: TokenType::BACKTICK,
+                    value: token.to_string(),
+                    location: self.position,
+                };
                 self.position.1 += 1;
                 self.tokens.push(token);
-            },
-            // New line 
-            '\n' => {  
-                let token = Token { token_type: TokenType::NEWLINE, value: token.to_string(), location: self.position };
+            }
+            // New line
+            '\n' => {
+                let token = Token {
+                    token_type: TokenType::NEWLINE,
+                    value: token.to_string(),
+                    location: self.position,
+                };
                 self.position.0 += 1;
                 self.position.1 = 0;
                 self.tokens.push(token);
-            },
+            }
 
             // Just strings
-            _ => { 
+            _ => {
                 let mut text = String::from(token);
                 let mut position = 1;
-                let specials = vec![ '\n', '*', '_', '`'];
+                let specials = vec!['\n', '*', '_', '`'];
                 loop {
                     let peeked = iter.peek();
                     match peeked {
@@ -109,19 +125,23 @@ impl Lexer {
                             text.push(peek.to_owned());
                             position += 1;
                             iter.next();
-                        },
-                        None => {break;}
+                        }
+                        None => {
+                            break;
+                        }
                     };
+                }
+                let token = Token {
+                    token_type: TokenType::TEXT,
+                    value: text,
+                    location: self.position,
                 };
-                let token = Token { token_type: TokenType::TEXT, value: text, location: self.position };
                 self.position.1 += position;
                 self.tokens.push(token);
-            },
+            }
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -133,11 +153,31 @@ mod tests {
         let mut scanner = Lexer::new(source);
         scanner.scan();
         let tokens = vec![
-            Token { token_type: TokenType::HASH, value: "#".to_string(), location: (0, 0) },
-            Token { token_type: TokenType::HASH, value: "#".to_string(), location: (0, 1) },
-            Token { token_type: TokenType::TEXT, value: " This is a heading".to_string(), location: (0, 2) },
-            Token { token_type: TokenType::NEWLINE, value: "\n".to_string(), location: (0, 20) },
-            Token { token_type: TokenType::TEXT, value: "I am a bunch of paragraph text. I can get pretty long.".to_string(), location: (1, 0) },
+            Token {
+                token_type: TokenType::HASH,
+                value: "#".to_string(),
+                location: (0, 0),
+            },
+            Token {
+                token_type: TokenType::HASH,
+                value: "#".to_string(),
+                location: (0, 1),
+            },
+            Token {
+                token_type: TokenType::TEXT,
+                value: " This is a heading".to_string(),
+                location: (0, 2),
+            },
+            Token {
+                token_type: TokenType::NEWLINE,
+                value: "\n".to_string(),
+                location: (0, 20),
+            },
+            Token {
+                token_type: TokenType::TEXT,
+                value: "I am a bunch of paragraph text. I can get pretty long.".to_string(),
+                location: (1, 0),
+            },
         ];
         assert_eq!(tokens.len(), scanner.tokens.len());
         for (index, token) in scanner.tokens.iter().enumerate() {
@@ -150,10 +190,26 @@ mod tests {
         let mut scanner = Lexer::new(source);
         scanner.scan();
         let tokens = vec![
-            Token { token_type: TokenType::TEXT, value: "I am ".to_string(), location: (0, 0) },
-            Token { token_type: TokenType::ASTERISK, value: "*".to_string(), location: (0, 5) },
-            Token { token_type: TokenType::TEXT, value: "italics".to_string(), location: (0, 6) },
-            Token { token_type: TokenType::ASTERISK, value: "*".to_string(), location: (0, 13) },
+            Token {
+                token_type: TokenType::TEXT,
+                value: "I am ".to_string(),
+                location: (0, 0),
+            },
+            Token {
+                token_type: TokenType::ASTERISK,
+                value: "*".to_string(),
+                location: (0, 5),
+            },
+            Token {
+                token_type: TokenType::TEXT,
+                value: "italics".to_string(),
+                location: (0, 6),
+            },
+            Token {
+                token_type: TokenType::ASTERISK,
+                value: "*".to_string(),
+                location: (0, 13),
+            },
         ];
         assert_eq!(tokens.len(), scanner.tokens.len());
         for (index, token) in scanner.tokens.iter().enumerate() {
@@ -167,12 +223,36 @@ mod tests {
         let mut scanner = Lexer::new(source);
         scanner.scan();
         let tokens = vec![
-            Token { token_type: TokenType::TEXT, value: "I am ".to_string(), location: (0, 0) },
-            Token { token_type: TokenType::ASTERISK, value: "*".to_string(), location: (0, 5) },
-            Token { token_type: TokenType::ASTERISK, value: "*".to_string(), location: (0, 6) },
-            Token { token_type: TokenType::TEXT, value: "bold".to_string(), location: (0, 7) },
-            Token { token_type: TokenType::ASTERISK, value: "*".to_string(), location: (0, 11) },
-            Token { token_type: TokenType::ASTERISK, value: "*".to_string(), location: (0, 12) },
+            Token {
+                token_type: TokenType::TEXT,
+                value: "I am ".to_string(),
+                location: (0, 0),
+            },
+            Token {
+                token_type: TokenType::ASTERISK,
+                value: "*".to_string(),
+                location: (0, 5),
+            },
+            Token {
+                token_type: TokenType::ASTERISK,
+                value: "*".to_string(),
+                location: (0, 6),
+            },
+            Token {
+                token_type: TokenType::TEXT,
+                value: "bold".to_string(),
+                location: (0, 7),
+            },
+            Token {
+                token_type: TokenType::ASTERISK,
+                value: "*".to_string(),
+                location: (0, 11),
+            },
+            Token {
+                token_type: TokenType::ASTERISK,
+                value: "*".to_string(),
+                location: (0, 12),
+            },
         ];
         assert_eq!(tokens.len(), scanner.tokens.len());
         for (index, token) in scanner.tokens.iter().enumerate() {
@@ -186,10 +266,26 @@ mod tests {
         let mut scanner = Lexer::new(source);
         scanner.scan();
         let tokens = vec![
-            Token { token_type: TokenType::TEXT, value: "I am ".to_string(), location: (0, 0) },
-            Token { token_type: TokenType::BACKTICK, value: "`".to_string(), location: (0, 5) },
-            Token { token_type: TokenType::TEXT, value: "code".to_string(), location: (0, 6) },
-            Token { token_type: TokenType::BACKTICK, value: "`".to_string(), location: (0, 10) },
+            Token {
+                token_type: TokenType::TEXT,
+                value: "I am ".to_string(),
+                location: (0, 0),
+            },
+            Token {
+                token_type: TokenType::BACKTICK,
+                value: "`".to_string(),
+                location: (0, 5),
+            },
+            Token {
+                token_type: TokenType::TEXT,
+                value: "code".to_string(),
+                location: (0, 6),
+            },
+            Token {
+                token_type: TokenType::BACKTICK,
+                value: "`".to_string(),
+                location: (0, 10),
+            },
         ];
         assert_eq!(tokens.len(), scanner.tokens.len());
         for (index, token) in scanner.tokens.iter().enumerate() {

@@ -1,10 +1,10 @@
-mod types;
 mod parser;
+mod types;
 use std::fs::File;
 use std::io::prelude::*;
 
-use parser::lexer::Lexer;
 use clap::Parser;
+use parser::lexer::Lexer;
 
 use crate::types::elements;
 use crate::types::elements::Renderable;
@@ -14,13 +14,13 @@ use crate::types::elements::Renderable;
 struct Args {
     //Markdown file path
     #[arg(short, long)]
-    filepath: String 
+    filepath: String,
 }
 
 fn main() {
     let args = Args::parse();
     let md = std::fs::read_to_string(args.filepath);
-    
+
     let mut lexer = Lexer::new(md.unwrap().as_str());
     lexer.scan();
     let mut parser = parser::parser::Parser::new(lexer);
