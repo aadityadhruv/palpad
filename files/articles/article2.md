@@ -1,0 +1,28 @@
+### Smaller Header
+
+Here's how you **convert** a file. 
+
+it works *pretty well*. 
+
+```
+~  21 fn convert_file(filepath: &Path) {
+~_ 22     let md: Result<String, Error> = std::fs::read_to_string(path: filepath);
+   23
+   24     let mut lexer: Lexer = Lexer::new(source: md.unwrap().as_str());
+   25     lexer.scan();
+   26     let mut parser: Parser = parser::parser::Parser::new(lexer);
+   27     parser.parse();
+   28     let root: Node = parser.tree;
+   29     let mut doc: HTML = elements::HTML::new();
+   30     for child: Exp in root.children {
+   31         let ast: Box<dyn AST> = child.item;
+   32         doc.items.push(ast.convert_to_renderable());
+   33     }
+   34     let doc: String = doc.render();
+~  35     let html_filepath: PathBuf = Path::new(filepath).with_extension("html");
++  36     let mut file: File = File::create(path: html_filepath).unwrap();
+   37     file.write_all(buf: doc.as_bytes()).unwrap();
+
+```
+
+However, there is room for improvement.

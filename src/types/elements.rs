@@ -131,12 +131,12 @@ impl Renderable for Head {
 }
 // Heading
 pub struct Heading {
-    text: String,
+    text: Paragraph,
     level: u8,
 }
 
 impl Heading {
-    pub fn new(text: String, level: u8) -> Self {
+    pub fn new(text: Paragraph, level: u8) -> Self {
         Heading {
             text: text,
             level: level,
@@ -150,13 +150,12 @@ impl Renderable for Heading {
         let end_tag = format!("</h{}>", self.level);
 
         master.push_str(&start_tag);
-        master.push_str(&self.text);
+        master.push_str(&self.text.render());
         master.push_str(&end_tag);
         master
     }
 }
 
-// Heading
 pub struct HTML {
     pub items: Vec<Box<dyn Renderable>>,
 }

@@ -62,11 +62,12 @@ impl Into<elements::Paragraph> for &Paragraph {
 
 struct Heading {
     level: u8,
-    text: Text,
+    text: Paragraph,
 }
 impl Into<elements::Heading> for &Heading {
     fn into(self) -> elements::Heading {
-        elements::Heading::new(self.text.text.clone(), self.level)
+        let para: elements::Paragraph = (&self.text).into();
+        elements::Heading::new(para, self.level)
     }
 }
 
@@ -297,7 +298,7 @@ impl Parser {
             heading_size += 1;
             self.tokens.next();
         }
-        let heading_text = self.text();
+        let heading_text = self.paragraph();
         return Heading {
             level: heading_size,
             text: heading_text,

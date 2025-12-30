@@ -1,7 +1,8 @@
 mod parser;
 mod types;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::prelude::*;
+use std::path::Path;
 
 use clap::Parser;
 use parser::lexer::Lexer;
@@ -12,14 +13,16 @@ use crate::types::elements::Renderable;
 #[derive(clap::Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    //Markdown file path
+    //Markdown file or directory path
     #[arg(short, long)]
-    filepath: String,
+    path: String,
 }
 
-fn main() {
-    let args = Args::parse();
-    let md = std::fs::read_to_string(args.filepath);
+fn convert_file(filepath: &Path) {
+    if (!filepath.ends_with(".md")) {
+        return;
+    }
+    let md = std::fs::read_to_string(filepath);
 
     let mut lexer = Lexer::new(md.unwrap().as_str());
     lexer.scan();
@@ -32,6 +35,31 @@ fn main() {
         doc.items.push(ast.convert_to_renderable());
     }
     let doc = doc.render();
-    let mut file = File::create("out.html").unwrap();
+    let html_filepath = Path::new(filepath).with_extension("html");
+    let mut file = File::create(html_filepath).unwrap();
     file.write_all(doc.as_bytes()).unwrap();
+}
+
+fn convert_dir(dir: &Path) {
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_dir() {
+                convert_dir(&path);
+            } else {
+                convert_file(&path);
+            }
+        }
+    }
+}
+
+fn main() {
+    let args = Args::parse();
+    let path = Path::new(&args.path);
+    if path.is_file() {
+        convert_file(&path);
+    } else if path.is_dir() {
+        convert_dir(&path);
+    }
 }
